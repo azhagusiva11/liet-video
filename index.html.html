@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>LIET — How It Works</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Noto+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600&family=Noto+Sans+Tamil:wght@400;500;600&family=Noto+Sans+Malayalam:wght@400;500&family=Noto+Sans+Kannada:wght@400;500;600&family=Noto+Sans+Telugu:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  :root{
+    --paper:#F2EDE2; --ink:#1B1A17; --muted:#6F6A5E; --accent:#C0562C; --line:#D8D2C4;
+    --bg:#100E0A; --panel:#16140F; --card:#1C1A14; --card-line:#2A271F;
+    --txt:#EDE8DC; --txt-dim:#8a8472; --txt-soft:#B8B2A4;
+    --green:#6FB58A; --amber:#C99A4E; --red:#C0562C; --blue:#7fa8c9;
+    --feat:#1F6E63; --feat2:#123F39;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{width:100%;height:100%;background:#0b0a08;overflow:hidden;}
+  body{font-family:'EB Garamond',serif;color:var(--ink);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;}
+
+  /* pages stacked; one shown at a time (transform/scroll-free — maximally robust) */
+  .track{position:relative;width:100vw;height:100vh;overflow:hidden;}
+  .page{position:absolute;inset:0;display:none;align-items:center;justify-content:center;}
+  .page.active{display:flex;}
+
+  /* each page is a fixed 1080x1920 stage, scaled to fit the viewport */
+  .stage{width:1080px;height:1920px;background:var(--paper);position:relative;display:flex;flex-direction:column;padding:150px 64px 144px;flex-shrink:0;overflow:hidden;}
+  .stage::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 14% 6%, rgba(192,86,44,0.05), transparent 38%),radial-gradient(circle at 88% 96%, rgba(27,26,23,0.04), transparent 45%);pointer-events:none;}
+  .stage>*{position:relative;}
+
+  /* ===== animation layer ===== */
+  .a{opacity:0;}
+  .a.up{transform:translateY(34px);}
+  .a.dn{transform:translateY(-26px);}
+  .a.lf{transform:translateX(-40px);}
+  .a.rt{transform:translateX(40px);}
+  .a.sc{transform:scale(.9);}
+  .a.blur{filter:blur(6px);}
+  .a.in{opacity:1;transform:none;filter:none;transition:opacity .7s ease, transform .85s cubic-bezier(.16,.84,.3,1), filter .7s ease;}
+  .draw{transform:scaleX(0);transform-origin:left;}
+  .draw.in{transform:scaleX(1);transition:transform .8s cubic-bezier(.7,0,.2,1);}
+
+  /* shared masthead */
+  .mast{display:flex;align-items:baseline;justify-content:space-between;}
+  .wordmark{font-weight:700;font-size:62px;letter-spacing:1px;}
+  .wordmark .dot{color:var(--accent);}
+  .pagetag{font-family:'JetBrains Mono',monospace;font-size:16px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);font-weight:600;}
+  .toprule{height:2px;background:var(--ink);margin-top:24px;}
+
+  .kicker{font-family:'JetBrains Mono',monospace;font-size:20px;letter-spacing:4px;text-transform:uppercase;color:var(--accent);font-weight:600;}
+  .kicker.mt{margin-top:50px;}
+  .headline{font-weight:600;font-size:74px;line-height:1.08;letter-spacing:-0.5px;margin-top:22px;}
+  .headline.sm{font-size:60px;}
+  .headline em{font-style:italic;color:var(--accent);}
+  .subhead{font-family:'Noto Sans',sans-serif;font-size:27px;line-height:1.5;color:var(--muted);margin-top:24px;}
+
+  .spacer{flex:1;}
+  .foot{border-top:1.5px solid var(--ink);padding-top:28px;display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-size:17px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);font-weight:600;}
+
+  /* ===== PAGE 1 intro ===== */
+  .big-define{font-weight:600;font-size:84px;line-height:1.06;letter-spacing:-1px;margin-top:40px;}
+  .big-define em{font-style:italic;color:var(--accent);}
+  .swipehint{font-family:'JetBrains Mono',monospace;font-size:18px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-top:44px;display:flex;align-items:center;gap:12px;}
+  .swipehint .arrow{animation:nudge 1.4s infinite;}
+  @keyframes nudge{0%,100%{transform:translateX(0);}50%{transform:translateX(8px);}}
+  .steps-mini{margin-top:48px;display:flex;flex-direction:column;gap:24px;}
+  .smini{display:flex;align-items:baseline;gap:18px;}
+  .smini .n{font-family:'JetBrains Mono',monospace;font-size:22px;color:var(--accent);font-weight:600;min-width:44px;}
+  .smini .t{font-family:'EB Garamond',serif;font-size:33px;color:var(--ink);white-space:nowrap;}
+
+  /* ===== session window (page 2) ===== */
+  .session{margin-top:36px;background:var(--bg);border-radius:24px;overflow:hidden;flex:1;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(27,26,23,0.22);}
+  .session-head{display:flex;align-items:center;justify-content:space-between;padding:22px 30px;border-bottom:1px solid var(--card-line);font-family:'JetBrains Mono',monospace;font-size:15px;color:var(--txt-dim);}
+  .pill-global{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--card-line);border-radius:22px;padding:8px 16px;color:var(--txt-soft);font-size:15px;letter-spacing:1px;}
+  .pill-global .globe{width:9px;height:9px;border-radius:50%;background:var(--green);animation:pulseDot 1.6s infinite;}
+  @keyframes pulseDot{0%,100%{box-shadow:0 0 0 0 rgba(111,181,138,.5);}50%{box-shadow:0 0 0 7px rgba(111,181,138,0);}}
+  .enc{font-size:15px;letter-spacing:1px;text-align:right;}
+  .enc b{color:var(--txt);}
+  .rectag{display:flex;align-items:center;gap:8px;color:var(--accent);font-weight:600;letter-spacing:1px;font-size:14px;}
+  .rectag .rdot{width:11px;height:11px;background:var(--accent);border-radius:50%;animation:blinkRec 1.1s infinite;}
+  @keyframes blinkRec{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+  .sess-body{flex:1;display:flex;flex-direction:column;padding:32px 36px;overflow:hidden;gap:22px;}
+  .tchips{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .tchip{font-family:'JetBrains Mono',monospace;font-size:15px;background:var(--card);border:1px solid var(--card-line);border-radius:18px;padding:7px 14px;color:var(--txt-soft);letter-spacing:.5px;}
+  .tchip.lang{display:flex;align-items:center;gap:7px;}
+  .tchip.lang .d{width:8px;height:8px;border-radius:50%;background:var(--green);}
+  .patient-line{font-family:'JetBrains Mono',monospace;font-size:16px;letter-spacing:2px;text-transform:uppercase;color:var(--txt-dim);margin-top:20px;}
+  #langtag{color:var(--accent);transition:opacity .25s ease;}
+  .spoken{font-size:47px;line-height:1.42;color:var(--txt);margin-top:16px;flex:1;font-weight:400;}
+  .spoken .w{opacity:0;animation:wordIn .26s forwards;}
+  @keyframes wordIn{from{opacity:0;}to{opacity:1;}}
+  .spoken.tamil{font-family:'Noto Sans Tamil',serif;font-size:40px;}
+  .spoken.deva{font-family:'Noto Sans Devanagari',serif;font-size:41px;}
+  .spoken.malayalam{font-family:'Noto Sans Malayalam',serif;font-size:38px;}
+  .spoken.kannada{font-family:'Noto Sans Kannada',serif;font-size:40px;}
+  .spoken.telugu{font-family:'Noto Sans Telugu',serif;font-size:40px;}
+  .spoken.latin{font-family:'EB Garamond',serif;}
+  .caret{display:inline-block;width:11px;height:38px;background:var(--accent);vertical-align:middle;margin-left:4px;animation:blink 1s steps(2) infinite;}
+  @keyframes blink{0%,50%{opacity:1;}50.01%,100%{opacity:0;}}
+
+  .waverow{display:flex;align-items:center;gap:16px;border-top:1px dashed var(--card-line);padding-top:18px;}
+  .waverow .ilabel{font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:2px;color:var(--txt-dim);}
+  .wave{display:flex;align-items:center;gap:2px;height:46px;flex:1;overflow:hidden;}
+  .wave span{width:3px;border-radius:2px;background:var(--txt-dim);}
+  .waverow .rms{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--txt-dim);white-space:nowrap;}
+
+  .block-label{font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:2.5px;text-transform:uppercase;font-weight:600;display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+  .block-label .count{background:var(--card);border:1px solid var(--card-line);border-radius:12px;padding:2px 10px;font-size:12px;color:var(--txt-soft);}
+  .lbl-blue{color:var(--blue);}
+  .rowgrid{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+  .chipcard{background:var(--card);border:1px solid var(--card-line);border-radius:13px;padding:13px 15px;display:flex;gap:11px;align-items:center;}
+  .chipcard .ic{font-size:12px;flex:0 0 auto;} .ic-amber{color:var(--amber);} .ic-blue{color:#8fb8d6;}
+  .chipcard .col{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .chipcard .t{color:var(--txt);font-family:'Noto Sans',sans-serif;font-size:17px;font-weight:600;line-height:1.15;white-space:nowrap;}
+  .chipcard .t b{font-weight:700;}
+  .chipcard .s{color:var(--txt-dim);font-family:'Noto Sans',sans-serif;font-size:13px;line-height:1.2;white-space:nowrap;}
+  .caption{font-family:'JetBrains Mono',monospace;font-size:15px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-top:22px;display:flex;align-items:center;gap:10px;}
+  .caption .dash{width:28px;height:1px;background:var(--muted);}
+
+  /* ===== capture / privacy (page 3) ===== */
+  .priv-card{margin-top:42px;background:var(--bg);border-radius:22px;padding:40px 42px;box-shadow:0 30px 70px rgba(27,26,23,0.2);}
+  .priv-tag{font-family:'JetBrains Mono',monospace;font-size:15px;letter-spacing:2px;text-transform:uppercase;color:var(--txt-dim);display:flex;align-items:center;justify-content:space-between;}
+  .priv-quote{font-family:'EB Garamond',serif;font-size:40px;line-height:1.5;color:var(--txt);margin-top:24px;}
+  .scrub{position:relative;display:inline-block;white-space:nowrap;}
+  .scrub .real{transition:opacity .25s .35s ease;}
+  .scrub .bar{position:absolute;left:-4px;top:2px;bottom:2px;right:-4px;background:var(--ink);border-radius:6px;transform:scaleX(0);transform-origin:left;transition:transform .45s cubic-bezier(.7,0,.2,1);}
+  .scrub.go .bar{transform:scaleX(1);}
+  .scrub.go .real{opacity:0;}
+  .pseud{color:var(--accent);font-style:italic;opacity:0;transform:translateX(-8px);transition:opacity .4s .9s ease, transform .4s .9s ease;display:inline-block;}
+  .scrub.go ~ .pseud, .pseud.show{opacity:1;transform:none;}
+  .privflow{display:flex;align-items:center;gap:18px;margin-top:34px;padding-top:28px;border-top:1px solid var(--card-line);}
+  .shield{width:62px;height:62px;flex:0 0 auto;border-radius:14px;background:rgba(111,181,138,0.12);display:flex;align-items:center;justify-content:center;}
+  .privflow .pt{font-family:'Noto Sans',sans-serif;font-size:21px;color:var(--txt-soft);line-height:1.4;}
+  .privflow .pt b{color:var(--txt);font-weight:600;}
+
+  /* ===== structured note (page 4) ===== */
+  .note{margin-top:36px;background:#fff;border-radius:20px;overflow:hidden;flex:1;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(27,26,23,0.16);border:1px solid var(--line);position:relative;}
+  .note-bar{height:10px;background:linear-gradient(90deg,var(--accent),#7a1f12);}
+  .note-pad{padding:38px 44px;flex:1;overflow:hidden;display:flex;flex-direction:column;gap:20px;}
+  .note-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:20px;}
+  .note-title{font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+  .note-title b{display:block;font-family:'EB Garamond',serif;font-size:36px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:600;margin-top:6px;}
+  .note-title b em{font-style:italic;color:var(--accent);}
+  .note-meta{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--muted);text-align:right;line-height:1.7;}
+  .note-meta b{color:var(--green);}
+  .nsec-label{font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:8px;}
+  .nsec-label::before{content:"";width:4px;height:18px;background:var(--accent);display:inline-block;}
+  .nsec-body{font-family:'EB Garamond',serif;font-size:24px;line-height:1.5;color:var(--ink);margin-top:10px;}
+  .nsec-neg{font-style:italic;color:var(--muted);font-size:21px;margin-top:8px;}
+  .rxrow{display:flex;align-items:center;gap:12px;font-family:'Noto Sans',sans-serif;font-size:20px;color:var(--ink);margin-top:8px;}
+  .rxtag{font-family:'JetBrains Mono',monospace;font-size:12px;padding:3px 9px;border-radius:6px;letter-spacing:.5px;}
+  .rx-cont{background:#E7E6DC;color:#5a6b4f;} .rx-stop{background:#F3DCD4;color:#9a3b22;} .rx-new{background:#DCE6EC;color:#3a6178;}
+  .impression{background:#FBEEEA;border-left:4px solid var(--accent);border-radius:0 12px 12px 0;padding:20px 22px;margin-top:4px;}
+  .impression .il{font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);font-weight:600;}
+  .impression .it{font-family:'EB Garamond',serif;font-style:italic;font-size:26px;line-height:1.35;color:var(--ink);margin-top:8px;}
+  .impression .disc{font-family:'Noto Sans',sans-serif;font-size:14px;color:var(--muted);margin-top:10px;font-style:normal;}
+
+  /* ===== safety net (page 5) ===== */
+  .safety-cards{margin-top:46px;display:flex;flex-direction:column;gap:22px;}
+  .scard{background:#fff;border:1px solid var(--line);border-radius:18px;padding:30px 32px;box-shadow:0 14px 40px rgba(27,26,23,0.07);}
+  .scard.flag{border-color:rgba(192,86,44,0.4);}
+  .scard .sc-ic{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:18px;}
+  .sc-amber{background:#FBF1DF;color:#a87a2e;} .sc-green{background:#E8F1EA;color:#3f7a56;} .sc-red{background:#FBEAE4;color:var(--accent);}
+  .scard.flag .sc-ic{animation:warnPulse 1.8s infinite;}
+  @keyframes warnPulse{0%,100%{box-shadow:0 0 0 0 rgba(192,86,44,.35);}50%{box-shadow:0 0 0 12px rgba(192,86,44,0);}}
+  .scard .sc-t{font-family:'EB Garamond',serif;font-size:38px;font-weight:600;color:var(--ink);}
+  .scard .sc-t em{font-style:italic;color:var(--accent);}
+  .scard .sc-b{font-family:'Noto Sans',sans-serif;font-size:23px;line-height:1.5;color:var(--muted);margin-top:12px;}
+
+  /* ===== payoff (page 6) ===== */
+  .stat-wrap{margin-top:54px;}
+  .stat{font-family:'EB Garamond',serif;font-weight:600;font-size:140px;line-height:.92;letter-spacing:-3px;color:var(--accent);font-style:italic;display:flex;align-items:baseline;flex-wrap:wrap;column-gap:18px;}
+  .stat .lead{font-style:italic;font-weight:600;font-size:58px;letter-spacing:-1px;color:var(--accent);white-space:nowrap;}
+  .stat .unit{flex-basis:100%;font-style:normal;font-size:52px;color:var(--ink);letter-spacing:-1px;line-height:1.08;margin-top:10px;}
+  .stat-sub{font-family:'EB Garamond',serif;font-size:46px;line-height:1.22;color:var(--ink);margin-top:30px;}
+  .stat-sub .ac{color:var(--accent);font-style:italic;}
+  .footnote{font-family:'Noto Sans',sans-serif;font-size:18px;color:var(--muted);margin-top:22px;font-style:italic;}
+
+  /* ===== vision / memory (page 7) ===== */
+  .memory-text{font-family:'EB Garamond',serif;font-size:46px;line-height:1.28;color:var(--ink);margin-top:30px;}
+  .memory-text .ac{color:var(--accent);font-style:italic;}
+  .timeline{margin-top:60px;display:flex;align-items:center;gap:0;}
+  .tnode{display:flex;flex-direction:column;align-items:center;gap:16px;flex:0 0 auto;width:200px;text-align:center;}
+  .tnode .tdot{width:26px;height:26px;border-radius:50%;background:var(--accent);opacity:.25;transition:opacity .5s ease, box-shadow .5s ease;}
+  .tnode.on .tdot{opacity:1;box-shadow:0 0 0 8px rgba(192,86,44,.14);}
+  .tnode .tl{font-family:'JetBrains Mono',monospace;font-size:16px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);line-height:1.4;}
+  .tnode.on .tl{color:var(--ink);}
+  .tseg{flex:1;height:3px;background:var(--line);position:relative;overflow:hidden;}
+  .tseg .fill{position:absolute;inset:0;background:var(--accent);transform:scaleX(0);transform-origin:left;}
+  .tseg.on .fill{transform:scaleX(1);transition:transform .7s ease;}
+  .devtag{font-family:'JetBrains Mono',monospace;font-size:18px;letter-spacing:3px;text-transform:uppercase;color:var(--accent);font-weight:600;margin-top:58px;display:inline-flex;align-items:center;gap:12px;}
+  .devtag .dt{width:10px;height:10px;border-radius:50%;border:2px solid var(--accent);}
+
+  /* ===== LOI ask (page 8) ===== */
+  .ask-steps{margin-top:44px;display:flex;flex-direction:column;gap:28px;}
+  .astep{display:flex;gap:22px;align-items:flex-start;}
+  .astep .ar{font-family:'JetBrains Mono',monospace;font-size:38px;color:var(--accent);line-height:1;font-weight:600;}
+  .astep .ab{font-family:'EB Garamond',serif;}
+  .astep .ab .at{font-size:38px;font-weight:600;color:var(--ink);line-height:1.15;}
+  .astep .ab .as{font-family:'Noto Sans',sans-serif;font-size:22px;color:var(--muted);margin-top:7px;line-height:1.45;}
+  .astep .ab .at .site{color:var(--accent);}
+  .ask-close{font-family:'EB Garamond',serif;font-style:italic;font-size:42px;line-height:1.3;color:var(--ink);margin-top:48px;}
+  .ask-close .ac{color:var(--accent);}
+
+  /* ===== PAGE 1 — mic / listening block ===== */
+  .mic-panel{margin-top:46px;background:radial-gradient(120% 140% at 85% 10%, #211d15, #100E0A);border:1px solid var(--card-line);border-radius:26px;padding:40px 44px;display:flex;align-items:center;gap:36px;box-shadow:0 26px 60px -22px rgba(0,0,0,.45);position:relative;overflow:hidden;}
+  .mic-panel::after{content:"";position:absolute;right:-60px;top:-60px;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.06);}
+  .mic-orb{width:118px;height:118px;flex:0 0 auto;border-radius:50%;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;position:relative;}
+  .mic-orb::before,.mic-orb::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid rgba(192,86,44,.55);animation:ripple 2.4s ease-out infinite;}
+  .mic-orb::after{animation-delay:1.2s;}
+  @keyframes ripple{0%{transform:scale(1);opacity:.7;}100%{transform:scale(1.7);opacity:0;}}
+  .mic-panel .mtext{flex:1;color:#F6EFE4;}
+  .mic-panel .ml1{font-family:'EB Garamond',serif;font-size:40px;font-weight:600;line-height:1.12;}
+  .mic-panel .ml2{font-family:'JetBrains Mono',monospace;font-size:16px;letter-spacing:2px;text-transform:uppercase;color:rgba(246,239,228,.72);margin-top:10px;}
+  .mic-eq{display:flex;align-items:center;gap:5px;height:54px;margin-top:18px;}
+  .mic-eq i{width:5px;border-radius:4px;background:rgba(246,239,228,.85);}
+
+  /* ===== PAGE 2 — bigger wave + pattern alert ===== */
+  .bigwave{flex:1;display:flex;align-items:center;justify-content:center;gap:2px;min-height:0;overflow:hidden;padding:6px 0;}
+  .bigwave span{width:3px;border-radius:2px;background:var(--txt-dim);}
+  .palert{margin-top:14px;border:1px solid rgba(192,86,44,.5);background:rgba(192,86,44,.10);border-radius:14px;padding:14px 18px;display:flex;align-items:center;gap:14px;}
+  .palert .pi{width:34px;height:34px;flex:0 0 auto;border-radius:9px;background:rgba(192,86,44,.18);display:flex;align-items:center;justify-content:center;}
+  .palert .ptxt{font-family:'Noto Sans',sans-serif;font-size:18px;color:var(--txt);line-height:1.3;}
+  .palert .ptxt b{color:var(--accent);font-weight:700;}
+  .palert .pmeta{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:1px;color:var(--accent);white-space:nowrap;}
+
+  /* ===== PAGE 2 — live-capture, panels stacked below ===== */
+  .sess-body2{flex:1;display:flex;flex-direction:column;padding:28px 34px;gap:20px;min-height:0;}
+  .topzone{flex:1;display:flex;flex-direction:column;min-height:0;}
+  .topzone .patient-line{margin-top:16px;}
+  .topzone .spoken{flex:1;font-size:40px;line-height:1.4;margin-top:14px;}
+  .topzone .spoken.tamil,.topzone .spoken.kannada,.topzone .spoken.telugu{font-size:35px;}
+  .topzone .spoken.deva{font-size:36px;}
+  .topzone .spoken.malayalam{font-size:33px;}
+  .topzone .spoken .g{color:var(--green);}
+  .lowergrid{display:grid;grid-template-columns:1fr 1fr;gap:0 34px;}
+  .lcol,.rcol{display:flex;flex-direction:column;}
+  .lowergrid .cap-sec{margin-top:18px;}
+  .scol{padding:24px 24px;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+  .caplabel{font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:600;display:flex;align-items:center;gap:9px;}
+  .caplabel .n{background:var(--card);border:1px solid var(--card-line);border-radius:10px;padding:1px 9px;font-size:12px;color:var(--txt-soft);}
+  .cl-green{color:var(--green);} .cl-amber{color:var(--amber);} .cl-blue{color:var(--blue);}
+  .capcard{background:var(--card);border:1px solid var(--card-line);border-radius:12px;padding:13px 15px;margin-top:12px;display:flex;gap:12px;align-items:flex-start;}
+  .capcard .cic{width:24px;height:24px;flex:0 0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;margin-top:1px;}
+  .capcard .cic.ok{background:rgba(111,181,138,.16);color:var(--green);}
+  .capcard .cic.qq{border:1.5px solid rgba(201,154,78,.55);color:var(--amber);}
+  .capcard .cic.bl{background:rgba(127,168,201,.16);color:var(--blue);}
+  .capcard .cic.am{background:rgba(201,154,78,.16);color:var(--amber);}
+  .capcard > div:last-child{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .capcard .ct{font-family:'Noto Sans',sans-serif;font-size:16px;font-weight:600;color:var(--txt);line-height:1.25;}
+  .capcard .ct b{font-weight:700;}
+  .capcard .cs{font-family:'Noto Sans',sans-serif;font-size:13px;color:var(--txt-dim);margin-top:3px;line-height:1.3;}
+  .cap-sec{margin-top:26px;}
+
+  .scol-c .tchips{margin-bottom:0;}
+  .scol-c .patient-line{margin-top:18px;}
+  .scol-c .spoken{font-size:31px;line-height:1.42;margin-top:14px;}
+  .scol-c .spoken.tamil,.scol-c .spoken.kannada,.scol-c .spoken.telugu{font-size:28px;}
+  .scol-c .spoken.deva{font-size:29px;}
+  .scol-c .spoken.malayalam{font-size:26px;}
+  .scol-c .spoken .g{color:var(--green);}
+  .iwrow{display:flex;align-items:center;gap:12px;border-top:1px dashed var(--card-line);padding-top:14px;margin-top:14px;}
+  .iwrow .ilabel{font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:2px;color:var(--txt-dim);}
+  .iwave{display:flex;align-items:center;gap:2px;height:42px;flex:1;overflow:hidden;}
+  .iwave span{width:3px;border-radius:2px;background:var(--txt-dim);}
+  .iwrow .rms{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--txt-dim);white-space:nowrap;}
+
+  .ralert{margin-top:auto;border:1px solid rgba(192,86,44,.5);background:rgba(192,86,44,.10);border-radius:14px;padding:16px 18px;}
+  .ralert .rh{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);font-weight:600;display:flex;align-items:center;gap:8px;}
+  .ralert .rh .d{width:8px;height:8px;border-radius:50%;background:var(--accent);}
+  .ralert .rb{font-family:'EB Garamond',serif;font-style:italic;font-size:21px;line-height:1.32;color:var(--txt);margin-top:10px;}
+  .ralert .rf{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--accent);margin-top:10px;}
+
+  /* ===== PAGE 3 — structured extraction panel ===== */
+  .xpanel{margin-top:26px;background:var(--bg);border-radius:22px;padding:30px 34px;box-shadow:0 26px 60px -24px rgba(27,26,23,.22);}
+  .xhead{display:flex;align-items:center;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:15px;letter-spacing:2px;text-transform:uppercase;color:var(--txt-dim);}
+  .xhead .xlive{color:var(--green);display:flex;align-items:center;gap:8px;}
+  .xhead .xlive .d{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulseDot 1.6s infinite;}
+  .xchips{display:flex;flex-wrap:wrap;gap:10px;margin-top:20px;}
+  .xchip{font-family:'Noto Sans',sans-serif;font-size:18px;color:var(--txt);background:var(--card);border:1px solid var(--card-line);border-radius:12px;padding:9px 15px;display:flex;align-items:center;gap:9px;}
+  .xchip .xt{width:7px;height:7px;border-radius:2px;background:var(--green);}
+  .clarify{margin-top:22px;border:1px solid rgba(201,154,78,.45);background:rgba(201,154,78,.10);border-radius:14px;padding:18px 20px;display:flex;gap:15px;align-items:flex-start;}
+  .clarify .ci{width:38px;height:38px;flex:0 0 auto;border-radius:10px;background:rgba(201,154,78,.16);display:flex;align-items:center;justify-content:center;}
+  .clarify .cl{font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--amber);}
+  .clarify .cb{font-family:'EB Garamond',serif;font-size:25px;line-height:1.32;color:var(--txt);margin-top:6px;}
+  .clarify .cb em{font-style:italic;color:var(--amber);}
+
+  /* ===== PAGE 4 — full note + fill animation ===== */
+  .note.full .note-pad{gap:24px;}
+  .note-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:20px 34px;}
+  .nsec-body.sm{font-size:21px;line-height:1.46;}
+  .sym-list{display:flex;flex-direction:column;gap:9px;margin-top:10px;}
+  .sym{font-family:'Noto Sans',sans-serif;font-size:18px;color:var(--ink);line-height:1.3;display:flex;gap:11px;align-items:baseline;}
+  .sym::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);flex:0 0 auto;transform:translateY(-2px);}
+  .neg{font-family:'Noto Sans',sans-serif;font-size:18px;color:var(--muted);line-height:1.3;display:flex;gap:11px;align-items:baseline;margin-top:9px;}
+  .neg .xx{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:15px;flex:0 0 auto;}
+  .medpill{display:inline-flex;align-items:center;font-family:'JetBrains Mono',monospace;font-size:15px;color:#a87a2e;background:#FBF1DF;border:1px solid #e8d3a8;border-radius:8px;padding:7px 13px;margin-top:10px;}
+  .note-impr{background:var(--accent);border-radius:14px;padding:20px 24px;color:#F6EFE4;}
+  .note-impr .il{font-family:'JetBrains Mono',monospace;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:rgba(246,239,228,.8);}
+  .note-impr .it{font-family:'EB Garamond',serif;font-style:italic;font-size:27px;line-height:1.3;margin-top:8px;}
+  .workup{display:flex;flex-direction:column;gap:10px;}
+  .wrow{display:flex;align-items:baseline;gap:13px;font-family:'Noto Sans',sans-serif;font-size:18px;color:var(--ink);}
+  .wtag{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.5px;padding:4px 9px;border-radius:6px;flex:0 0 auto;}
+  .wt1{background:var(--accent);color:#fff;} .wt2{background:#7a1f12;color:#fff;} .wt3{background:var(--ink);color:#fff;} .wt4{background:#9a958a;color:#fff;}
+  .note-signoff{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:18px;margin-top:auto;font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:1px;color:var(--muted);}
+  .note-signoff em{font-family:'EB Garamond',serif;font-style:italic;font-size:24px;letter-spacing:0;color:var(--ink);opacity:.55;border-bottom:1px solid var(--line);text-transform:none;white-space:nowrap;}
+  /* fill scan line */
+  .fillscan{position:absolute;left:0;right:0;height:120px;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(192,86,44,.10),transparent);opacity:0;z-index:5;}
+
+  /* ===== PAGE 6 — payoff + vision combined ===== */
+  .pay-divider{height:1px;background:var(--line);margin:36px 0 0;}
+  .vis-block{margin-top:34px;}
+
+  /* ===== PAGE 7 — closing CTA bar ===== */
+  .cta-bar{margin-top:38px;background:radial-gradient(120% 160% at 88% 12%, #211d15, #100E0A);border:1px solid var(--card-line);border-radius:22px;padding:34px 40px;display:flex;align-items:center;gap:28px;box-shadow:0 24px 56px -22px rgba(0,0,0,.45);position:relative;overflow:hidden;}
+  .cta-bar::after{content:"";position:absolute;left:-50px;bottom:-70px;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,.06);}
+  .cta-bar .cta-l{flex:1;position:relative;}
+  .cta-bar .cta-k{font-family:'JetBrains Mono',monospace;font-size:15px;letter-spacing:2px;text-transform:uppercase;color:rgba(246,239,228,.72);}
+  .cta-bar .cta-u{font-family:'EB Garamond',serif;font-size:50px;font-weight:600;color:#F6EFE4;line-height:1.05;margin-top:6px;}
+  .cta-bar .cta-arrow{width:74px;height:74px;flex:0 0 auto;border-radius:50%;background:rgba(192,86,44,.22);display:flex;align-items:center;justify-content:center;font-size:34px;color:#F6EFE4;position:relative;}
+
+  /* ===== chrome: progress + dot nav ===== */
+  .progress{position:fixed;top:0;left:0;height:5px;background:var(--accent);width:12.5%;z-index:60;transition:width .6s cubic-bezier(.62,.01,.2,1);box-shadow:0 0 14px rgba(192,86,44,.55);}
+  .nav{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:50;}
+  .nav .ndot{width:11px;height:11px;border-radius:50%;background:rgba(27,26,23,.22);cursor:pointer;transition:all .35s;}
+  .nav .ndot.active{background:var(--accent);width:30px;border-radius:6px;}
+</style>
+</head>
+<body style="font-family: &quot;EB Garamond&quot;">
+  <div class="track" id="track">
+
+    <!-- ============ PAGE 1 — INTRO ============ -->
+    <section class="page active" data-screen-label="01"><div class="stage" data-page="0">
+      <div class="mast"><span class="wordmark a sc">LIET<span class="dot">.</span></span><span class="pagetag a" data-d="120">01 / 07</span></div>
+      <div class="toprule draw" data-d="220"></div>
+      <div class="kicker mt a up" data-d="360">How LIET works</div>
+      <h1 class="big-define a up" data-d="500">From conversation to a <em>complete clinical record</em> — in one visit.</h1>
+      <p class="subhead a up" data-d="680">Speak naturally with your patient, in any language. LIET captures the visit, structures the note, and surfaces what's worth a second look. You review, edit, and sign. The record stays yours.</p>
+      <div class="steps-mini">
+        <div class="smini a lf" data-d="900"><span class="n">01</span><span class="t">Speak — in any language, naturally</span></div>
+        <div class="smini a lf" data-d="1020"><span class="n">02</span><span class="t">LIET structures the note</span></div>
+        <div class="smini a lf" data-d="1140"><span class="n">03</span><span class="t">It flags what's worth a review</span></div>
+        <div class="smini a lf" data-d="1260"><span class="n">04</span><span class="t">You sign &amp; print the OPD sheet</span></div>
+      </div>
+      <div class="mic-panel a up" data-d="1400">
+        <div class="mic-orb">
+          <svg width="50" height="50" viewBox="0 0 24 24" fill="none" stroke="#F6EFE4" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
+        </div>
+        <div class="mtext">
+          <div class="ml1">You talk. LIET writes.</div>
+          <div class="mic-eq" id="micEq"></div>
+          <div class="ml2">Always listening · never typing</div>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="swipehint a up" data-d="1560">Swipe to see it work <span class="arrow">→</span></div>
+      <div class="foot a" data-d="1660" style="margin-top:28px;"><span>Clinical Documentation</span><span>liet-research.eu</span></div>
+    </div></section>
+
+    <!-- ============ PAGE 2 — MULTILINGUAL LIVE SESSION ============ -->
+    <section class="page" data-screen-label="02"><div class="stage" data-page="1">
+      <div class="mast"><span class="wordmark a sc">LIET<span class="dot">.</span></span><span class="pagetag a" data-d="120">02 / 07</span></div>
+      <div class="toprule draw" data-d="220"></div>
+      <div class="kicker mt a up" data-d="340">01 · Speak any language</div>
+      <h1 class="headline sm a up" data-d="460">Your patient speaks. <em>LIET listens.</em></h1>
+      <div class="session a up" data-d="620">
+        <div class="session-head">
+          <span class="pill-global"><span class="globe"></span> MULTILINGUAL</span>
+          <span class="rectag"><span class="rdot"></span> STOP · 00:42</span>
+        </div>
+        <div class="sess-body2">
+          <div class="topzone">
+            <div class="tchips">
+              <span class="tchip lang"><span class="d"></span><span id="enchip">EN ⇄ TA</span></span>
+              <span class="tchip">mixed-language</span>
+              <span class="tchip">99% conf.</span>
+              <span class="tchip">Secure cloud hosting</span>
+            </div>
+            <div class="patient-line">PATIENT · 00:00:42 · <span id="langtag">TAMIL → ENGLISH</span></div>
+            <div class="spoken tamil" id="spoken">…</div>
+            <div class="iwrow"><span class="ilabel">INPUT</span><div class="iwave" id="wave"></div><span class="rms">RMS <b>-17</b> dB</span></div>
+          </div>
+          <div class="lowergrid">
+            <div class="lcol">
+              <div class="caplabel cl-green">Capturing <span class="n">1</span></div>
+              <div class="capcard a up" data-d="900"><span class="cic ok">✓</span><div><div class="ct">Joint pain</div><div class="cs">bilateral · 4 months</div></div></div>
+              <div class="caplabel cl-amber cap-sec">Not asked yet <span class="n">3</span></div>
+              <div class="capcard a up" data-d="980"><span class="cic qq">?</span><div><div class="ct">Location of pain</div><div class="cs">where exactly · how it feels</div></div></div>
+              <div class="capcard a up" data-d="1040"><span class="cic qq">?</span><div><div class="ct">Fever pattern</div><div class="cs">continuous or intermittent</div></div></div>
+              <div class="capcard a up" data-d="1100"><span class="cic qq">?</span><div><div class="ct">Family history</div><div class="cs">autoimmune · beyond parents</div></div></div>
+            </div>
+            <div class="rcol">
+              <div class="caplabel cl-blue">Vitals captured <span class="n">2</span></div>
+              <div class="capcard a up" data-d="940"><span class="cic bl">♥</span><div><div class="ct">BP <b>148/96</b></div><div class="cs">repeat 146/94 — new-onset</div></div></div>
+              <div class="capcard a up" data-d="1020"><span class="cic bl">♥</span><div><div class="ct">HR <b>88</b> bpm</div><div class="cs">regular · sinus</div></div></div>
+              <div class="caplabel cl-amber cap-sec">Investigations queued <span class="n">4</span></div>
+              <div class="capcard a up" data-d="1120"><span class="cic am">◷</span><div><div class="ct">UPCR + microscopy</div><div class="cs">renal · priority 1</div></div></div>
+              <div class="capcard a up" data-d="1180"><span class="cic am">◷</span><div><div class="ct">ANA + anti-dsDNA</div><div class="cs">immunology · priority 2</div></div></div>
+            </div>
+          </div>
+          <div class="palert a up" data-d="1300">
+            <span class="pi"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C0562C" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r=".6" fill="#C0562C" stroke="none"/></svg></span>
+            <div class="ptxt"><b>Pattern alert · review</b> — frothy urine + new-onset HTN + bilateral edema. SLICC 2012: <b>4/11</b> positive.</div>
+            <span class="pmeta">RENAL ↗</span>
+          </div>
+        </div>
+      </div>
+      <div class="caption a" data-d="1440"><span class="dash"></span> ILLUSTRATION OF A LIET SESSION</div>
+    </div></section>
+
+    <!-- ============ PAGE 3 — CAPTURE / PRIVACY ============ -->
+    <section class="page" data-screen-label="03"><div class="stage" data-page="2">
+      <div class="mast"><span class="wordmark a sc">LIET<span class="dot">.</span></span><span class="pagetag a" data-d="120">03 / 07</span></div>
+      <div class="toprule draw" data-d="220"></div>
+      <div class="kicker mt a up" data-d="340">02 · Captured live, kept private</div>
+      <h1 class="headline sm a up" data-d="460">Identifiers leave <em>before</em> anything is processed.</h1>
+      <p class="subhead a up" data-d="600">Names and IDs are stripped and swapped for pseudonyms — the record stays useful, the patient stays private.</p>
+      <div class="priv-card a up" data-d="760">
+        <div class="priv-tag"><span>LIVE TRANSCRIPT</span><span>EN ⇄ TA</span></div>
+        <div class="priv-quote">“Joint pain four months, morning stiffness — and a rash, for <span class="scrub" id="scrub"><span class="real">Ravi&nbsp;Kumar</span><span class="bar"></span></span><span class="pseud" id="pseud">&nbsp;→ Patient&nbsp;A</span>.”</div>
+        <div class="privflow">
+          <span class="shield"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#6FB58A" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v6c0 5-3.5 8.5-8 11-4.5-2.5-8-6-8-11V5z"/><path d="M9 12l2 2 4-4"/></svg></span>
+          <div class="pt"><b>Name &amp; ID removed before processing.</b> Pseudonyms keep every record usable without exposing the patient.</div>
+        </div>
+      </div>
+
+      <div class="xpanel a up" data-d="980">
+        <div class="xhead"><span>Clinical intelligence · structured extraction</span><span class="xlive"><span class="d"></span>LIVE</span></div>
+        <div class="xchips">
+          <span class="xchip"><span class="xt"></span>Polyarthralgia · 4 mo</span>
+          <span class="xchip"><span class="xt"></span>Morning stiffness ~90 min</span>
+          <span class="xchip"><span class="xt"></span>Photosensitive malar rash</span>
+          <span class="xchip"><span class="xt"></span>Frothy urine · 1 mo</span>
+          <span class="xchip"><span class="xt"></span>Pedal edema</span>
+        </div>
+        <div class="clarify">
+          <span class="ci"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C99A4E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.8.4-1 .8-1 1.7"/><circle cx="12" cy="16.5" r=".6" fill="#C99A4E" stroke="none"/></svg></span>
+          <div><div class="cl">Needs your confirmation</div><div class="cb">A pertinent negative is unclear — <em>ask the patient about any prior hypertension</em>, then confirm. LIET never assumes.</div></div>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="foot a" data-d="1180"><span>Privacy by design</span><span>liet-research.eu</span></div>
+    </div></section>
+
+    <!-- ============ PAGE 4 — STRUCTURED NOTE ============ -->
+    <section class="page" data-screen-label="04"><div class="stage" data-page="3">
+      <div class="mast"><span class="wordmark a sc">LIET<span class="dot">.</span></span><span class="pagetag a" data-d="120">04 / 07</span></div>
+      <div class="toprule draw" data-d="220"></div>
+      <div class="kicker mt a up" data-d="340">03 · The note writes itself</div>
+      <h1 class="headline sm a up" data-d="460">A full clinical note, <em>written for you.</em></h1>
+      <div class="note full a up" data-d="600">
+        <div class="note-bar draw" data-d="700"></div>
+        <div class="fillscan" id="fillscan"></div>
+        <div class="note-pad">
+          <div class="note-head nf" data-nf="0">
+            <div class="note-title">LIET · GENERATED<b>Clinical consultation <em>note</em></b></div>
+            <div class="note-meta">Generated in <b>&lt;30 seconds</b><br>from voice transcript · 8-min consult</div>
+          </div>
+          <div class="nf" data-nf="1">
+            <div class="nsec-label">Chief complaint</div>
+            <div class="nsec-body sm">Bilateral joint pain × 4 months with morning stiffness, photosensitive facial rash, and <em style="font-style:italic;color:var(--accent);">frothy urine</em>.</div>
+          </div>
+          <div class="note-grid">
+            <div class="nf" data-nf="2">
+              <div class="nsec-label">Symptoms present</div>
+              <div class="sym-list">
+                <div class="sym">Bilateral joint pain × 4 mo, AM stiffness ~90 min</div>
+                <div class="sym">Facial rash over cheeks, worsens with sun</div>
+                <div class="sym">Recurrent oral ulcers, 2–3×/month</div>
+                <div class="sym">Frothy urine × 1 month</div>
+                <div class="sym">Pedal edema (eve), periorbital puffiness (AM)</div>
+                <div class="sym">Low-grade fever 99–100°F, 2–3 days/week</div>
+              </div>
+            </div>
+            <div class="nf" data-nf="3">
+              <div class="nsec-label">Pertinent negatives</div>
+              <div class="neg"><span class="xx">✕</span> No high-grade fever</div>
+              <div class="neg"><span class="xx">✕</span> No breathlessness</div>
+              <div class="neg"><span class="xx">✕</span> No prior BP history</div>
+              <div class="nsec-label" style="margin-top:24px;">Current medications</div>
+              <span class="medpill">Prednisolone 10 mg OD</span>
+              <div class="nsec-neg" style="margin-top:10px;">previous — dramatic response, relapsed on stopping</div>
+            </div>
+          </div>
+          <div class="note-impr nf" data-nf="4">
+            <div class="il">Clinical impression · for the doctor's review</div>
+            <div class="it">Features suggestive of SLE with a possible renal thread to review.</div>
+          </div>
+          <div class="nf" data-nf="5">
+            <div class="nsec-label">Recommended workup</div>
+            <div class="workup" style="margin-top:12px;">
+              <div class="wrow"><span class="wtag wt1">PRIORITY 1</span> Renal: UPCR, urine microscopy, serum creatinine, eGFR</div>
+              <div class="wrow"><span class="wtag wt2">PRIORITY 2</span> Immunology: ANA (IIF, HEp-2), anti-dsDNA, C3/C4</div>
+              <div class="wrow"><span class="wtag wt3">PRIORITY 3</span> Haematology: CBC with differential, ESR, smear</div>
+            </div>
+          </div>
+          <div class="nf" data-nf="6">
+            <div class="nsec-label">Key considerations</div>
+            <div class="nsec-body sm">Consider nephrology referral given possible renal involvement. Monitor BP closely — repeat at next visit. An anti-dsDNA titre will help confirm and guide management.</div>
+          </div>
+          <div class="note-signoff nf" data-nf="7"><span>The doctor is always in control · Edit · Sign · Push to EHR</span><em>Awaiting clinician sign-off</em></div>
+        </div>
+      </div>
+    </div></section>
+
+    <!-- ============ PAGE 5 — SAFETY NET ============ -->
+    <section class="page" data-screen-label="05"><div class="stage" data-page="4">
+      <div class="mast"><span class="wordmark a sc">LIET<span class="dot">.</span></span><span class="pagetag a" data-d="120">05 / 07</span></div>
+      <div class="toprule draw" data-d="220"></div>
+      <div class="kicker mt a up" data-d="340">04 · The safety net</div>
+      <h1 class="headline sm a up" data-d="460">It catches what's <em>easy to miss.</em></h1>
+      <p class="subhead a up" data-d="600">Quietly, in the background — as suggestions you can act on or ignore. Never decisions.</p>
+      <div class="safety-cards">
+        <div class="scard flag a up" data-d="780">
+          <div class="sc-ic sc-red">⚠</div>
+          <div class="sc-t">Drug-interaction flags</div>
+          <div class="sc-b">If two medicines clash — like an NSAID with a blood-pressure drug — LIET flags it for your review against an Indian drug-brand database.</div>
+        </div>
+        <div class="scard a up" data-d="940">
+          <div class="sc-ic sc-amber">◷</div>
+          <div class="sc-t">Pertinent negatives &amp; checks</div>
+          <div class="sc-b">What the patient denied is captured too. Dose limits and contradictions are surfaced so nothing slips through.</div>
+        </div>
+        <div class="scard a up" data-d="1100">
+          <div class="sc-ic sc-green">✓</div>
+          <div class="sc-t"><em>You</em> stay in control</div>
+          <div class="sc-b">Every flag is a suggestion in a clearly-labelled panel — separate from your note. You decide what matters.</div>
+        </div>
+      </div>
+    </div></section>
+
+    <!-- ============ PAGE 6 — TIME PAYOFF + VISION ============ -->
+    <section class="page" data-screen-label="06"><div class="stage" data-page="5">
+      <div class="mast"><span class="wordmark a sc">LIET<span class="dot">.</span></span><span class="pagetag a" data-d="120">06 / 07</span></div>
+      <div class="toprule draw" data-d="220"></div>
+      <div class="kicker mt a up" data-d="360">Why doctors use it</div>
+      <div class="stat-wrap">
+        <div class="stat a up" data-d="520"><span class="lead">Up to</span> <span id="bignum">0</span><span style="font-style:normal;">*</span><span class="unit">minutes back — every day.</span></div>
+        <div class="stat-sub a up" data-d="760"><span class="ac">See more patients</span> — and keep a complete record of every one.</div>
+        <div class="footnote a up" data-d="920">*Based on doctor-reported time saved on documentation; varies by practice.</div>
+      </div>
+      <div class="pay-divider a" data-d="1040"></div>
+      <div class="vis-block">
+        <div class="kicker a up" data-d="1120">Where we're headed</div>
+        <div class="memory-text a up" data-d="1240" style="font-size:38px;margin-top:20px;">Not a single snapshot — <span class="ac">a record that remembers</span> what a patient has been through across every visit, catching patterns <span class="ac">easy to miss, early.</span></div>
+        <div class="timeline">
+          <div class="tnode" data-t="0"><span class="tdot"></span><span class="tl">Documentation<br>today</span></div>
+          <div class="tseg" data-s="0"><span class="fill"></span></div>
+          <div class="tnode" data-t="1"><span class="tdot"></span><span class="tl">Longitudinal<br>memory</span></div>
+          <div class="tseg" data-s="1"><span class="fill"></span></div>
+          <div class="tnode" data-t="2"><span class="tdot"></span><span class="tl">Earlier pattern<br>surfacing</span></div>
+        </div>
+        <div class="devtag a" data-d="1360"><span class="dt"></span>In development</div>
+      </div>
+      <div class="spacer"></div>
+      <div class="foot a" data-d="1480"><span>Clinical Documentation</span><span>liet-research.eu</span></div>
+    </div></section>
+
+    <!-- ============ PAGE 7 — THE LOI ASK ============ -->
+    <section class="page" data-screen-label="07"><div class="stage" data-page="6">
+      <div class="mast"><span class="wordmark a sc">LIET<span class="dot">.</span></span><span class="pagetag a" data-d="120">07 / 07</span></div>
+      <div class="toprule draw" data-d="220"></div>
+      <div class="kicker mt a up" data-d="340">Be part of it</div>
+      <h1 class="headline a up" data-d="460">Try it free. Then <em>help shape it.</em></h1>
+      <div class="ask-steps">
+        <div class="astep a lf" data-d="640"><span class="ar">→</span><div class="ab"><div class="at">Go to <span class="site">liet-research.eu</span> and sign up</div><div class="as">Just an email. Patients stay private — pseudonyms, with identifiers scrubbed before anything is processed.</div></div></div>
+        <div class="astep a lf" data-d="780"><span class="ar">→</span><div class="ab"><div class="at">Try it on your next consultation</div><div class="as">Speak the visit, review the note, print the OPD sheet on your own letterhead.</div></div></div>
+        <div class="astep a lf" data-d="920"><span class="ar">→</span><div class="ab"><div class="at">Tell us what works</div><div class="as">There's a Feedback section built in, and a Help section if you're stuck.</div></div></div>
+        <div class="astep a lf" data-d="1060"><span class="ar">→</span><div class="ab"><div class="at">Under “Work With Us” — sign the Letter of Intent</div><div class="as">See what's coming, read the user manual, and back the tool you'd want to keep using.</div></div></div>
+      </div>
+      <div class="ask-close a up" data-d="1240">Your feedback shapes <span class="ac">what we build next.</span></div>
+      <a href="https://liet-research.eu" target="_blank" rel="noopener" class="cta-bar a up" data-d="1380" style="text-decoration:none;">
+        <div class="cta-l">
+          <div class="cta-k">Start now · just an email</div>
+          <div class="cta-u">liet-research.eu</div>
+        </div>
+        <span class="cta-arrow">→</span>
+      </a>
+      <div class="spacer"></div>
+      <div class="foot a" data-d="1500"><span>liet-research.eu</span><span>Luxembourg · India</span></div>
+    </div></section>
+
+  </div>
+
+  <div class="progress" id="progress"></div>
+  <div class="nav" id="nav"></div>
+
+<script>
+/* ============================================================
+   LIET — Product Video engine
+   - fits 1080x1920 stages to viewport
+   - swipe / dot / edge-tap / keyboard nav
+   - replays entrance choreography every time a page lands
+   - page-specific animatics: live transcription, scrub,
+     count-up, timeline
+   ============================================================ */
+
+(function(){
+  'use strict';
+
+  /* ---------- responsive scale ---------- */
+  function scaleStages(){
+    const sw = window.innerWidth, sh = window.innerHeight;
+    const scale = Math.min(sw/1080, sh/1920);
+    document.querySelectorAll('.stage').forEach(s=>{
+      s.style.transform = 'scale('+scale+')';
+      s.style.transformOrigin = 'center';
+    });
+  }
+  window.addEventListener('resize', scaleStages);
+  scaleStages();
+
+  /* ---------- page model ---------- */
+  const track = document.getElementById('track');
+  const pages = Array.from(document.querySelectorAll('.page'));
+  const PAGES = pages.length;
+  let cur = 0;
+
+  const nav = document.getElementById('nav');
+  for(let i=0;i<PAGES;i++){
+    const d=document.createElement('div');
+    d.className='ndot'+(i===0?' active':'');
+    d.addEventListener('click',()=>go(i));
+    nav.appendChild(d);
+  }
+  const dots = Array.from(nav.children);
+  const progress = document.getElementById('progress');
+
+  function go(n){
+    n = Math.max(0, Math.min(PAGES-1, n));
+    pages.forEach((p,i)=>p.classList.toggle('active', i===n));
+    cur = n;
+    dots.forEach((d,i)=>d.classList.toggle('active', i===n));
+    progress.style.width = ((n+1)/PAGES*100)+'%';
+    transToken++;          // stop any running transcription
+    animatePage(n);        // replay this page's entrance every time it lands
+  }
+
+  /* ---------- entrance choreography (replayable, inline + fallback) ---------- */
+  function fromTransform(el){
+    const tx = el.classList.contains('lf') ? '-40px' : el.classList.contains('rt') ? '40px' : '0px';
+    const ty = el.classList.contains('up') ? '34px' : el.classList.contains('dn') ? '-26px' : '0px';
+    const sc = el.classList.contains('sc') ? ' scale(0.9)' : '';
+    return 'translate('+tx+','+ty+')'+sc;
+  }
+  function animatePage(idx){
+    const stage = pages[idx].querySelector('.stage');
+    const els = Array.prototype.slice.call(stage.querySelectorAll('.a, .draw, .nf'));
+    // reset page-specific bits
+    if(idx===2) resetScrub();
+    if(idx===5){ document.getElementById('bignum').textContent='0'; resetTimeline(); }
+
+    // 1) snap to hidden start state (no transition)
+    els.forEach(el=>{
+      el.style.transition='none';
+      if(el.classList.contains('draw')){ el.style.transform='scaleX(0)'; }
+      else { el.style.opacity='0'; el.style.transform=fromTransform(el); }
+    });
+    void stage.offsetWidth; // commit
+
+    // 2) play in, staggered via per-element transition-delay
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){
+      els.forEach(el=>{
+        let delay = parseInt(el.getAttribute('data-d')||'0',10);
+        if(el.classList.contains('nf')) delay = 760 + parseInt(el.getAttribute('data-nf')||'0',10)*150;
+        if(el.classList.contains('draw')){
+          el.style.transition='transform .8s cubic-bezier(.7,0,.2,1) '+delay+'ms';
+          el.style.transform='scaleX(1)';
+        } else {
+          el.style.transition='opacity .7s ease '+delay+'ms, transform .85s cubic-bezier(.16,.84,.3,1) '+delay+'ms';
+          el.style.opacity='1';
+          el.style.transform='none';
+        }
+      });
+    });});
+
+    // 3) safety net: guarantee fully visible even if transitions stall
+    clearTimeout(stage.__fb);
+    stage.__fb = setTimeout(function(){
+      els.forEach(el=>{
+        el.style.transition='none';
+        el.style.opacity='1';
+        el.style.transform = el.classList.contains('draw') ? 'scaleX(1)' : 'none';
+      });
+    }, 2900);
+
+    // page-specific animatics
+    if(idx===1) startTranscription();
+    if(idx===2) startScrub();
+    if(idx===3) startNoteFill();
+    if(idx===5){ startCountUp(); startTimeline(); }
+  }
+
+  /* ---------- navigation inputs ---------- */
+  // manual swipe (touch + pointer drag) — robust, no scroll/transform dependency
+  let sx=0, sy=0, tracking=false;
+  function down(x,y){ sx=x; sy=y; tracking=true; }
+  function up(x,y){
+    if(!tracking) return; tracking=false;
+    const dx=x-sx, dy=y-sy;
+    if(Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)) go(cur+(dx<0?1:-1));
+  }
+  track.addEventListener('touchstart',e=>down(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
+  track.addEventListener('touchend',e=>up(e.changedTouches[0].clientX,e.changedTouches[0].clientY),{passive:true});
+  track.addEventListener('mousedown',e=>down(e.clientX,e.clientY));
+  window.addEventListener('mouseup',e=>up(e.clientX,e.clientY));
+
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key===' ') go(cur+1);
+    if(e.key==='ArrowLeft'||e.key==='ArrowUp') go(cur-1);
+    if(e.key==='r'||e.key==='R') animatePage(cur); // replay current page
+  });
+
+  /* ---------- waveform (page 2) + mic equaliser (page 1) ---------- */
+  const wave = document.getElementById('wave');
+  const BARS = 130, bars=[];
+  for(let i=0;i<BARS;i++){const s=document.createElement('span');wave.appendChild(s);bars.push(s);}
+  const micEq = document.getElementById('micEq');
+  const EQ = 40, eqbars=[];
+  if(micEq){ for(let i=0;i<EQ;i++){const s=document.createElement('i');micEq.appendChild(s);eqbars.push(s);} }
+  let phase=0;
+  function animateWave(){
+    phase+=0.055;
+    for(let i=0;i<BARS;i++){
+      const travel=Math.sin((i*0.20)-phase);
+      const swell=Math.sin((i*0.03)-phase*0.4);
+      const env=0.55+0.45*Math.sin(phase*0.5+i*0.012);
+      const h=8+(Math.abs(travel)*0.7+Math.abs(swell)*0.3)*30*env;
+      bars[i].style.height=h.toFixed(1)+'px';
+      bars[i].style.opacity=(0.45+0.5*Math.abs(travel)).toFixed(2);
+    }
+    for(let i=0;i<eqbars.length;i++){
+      const v=Math.abs(Math.sin((i*0.45)-phase*1.6))*0.7 + Math.abs(Math.sin((i*0.13)-phase*0.8))*0.3;
+      eqbars[i].style.height=(8+v*46).toFixed(1)+'px';
+      eqbars[i].style.opacity=(0.5+0.45*v).toFixed(2);
+    }
+    requestAnimationFrame(animateWave);
+  }
+  animateWave();
+
+  /* ---------- live multilingual transcription (page 2) ---------- */
+  const langs=[
+    {tag:"TAMIL → ENGLISH",chip:"EN ⇄ TA",cls:"tamil",text:"வணக்கம் டாக்டர். கடந்த நான்கு மாதமா ரெண்டு கையிலயும் மூட்டு வலி, காலையில ஒரு மணி நேரத்துக்கு மேல விறைப்பு. முகத்துல வெயிலுல அதிகமாகுற சொறி, கடந்த ஒரு மாசமா நுரை மாதிரி சிறுநீர்."},
+    {tag:"GERMAN → ENGLISH",chip:"EN ⇄ DE",cls:"latin",text:"Hallo Frau Doktor. Seit vier Monaten Gelenkschmerzen in beiden Händen, morgens über eine Stunde Steifheit. Ein Gesichtsausschlag, der sich in der Sonne verschlimmert, und seit einem Monat schaumiger Urin."},
+    {tag:"KANNADA → ENGLISH",chip:"EN ⇄ KN",cls:"kannada",text:"ಹಲೋ ಡಾಕ್ಟರ್. ನಾಲ್ಕು ತಿಂಗಳಿಂದ ಎರಡೂ ಕೈಗಳಲ್ಲಿ ಕೀಲು ನೋವು, ಬೆಳಿಗ್ಗೆ ಒಂದು ಗಂಟೆ ಬಿಗಿತ. ಬಿಸಿಲಿನಲ್ಲಿ ಹೆಚ್ಚಾಗುವ ಮುಖದ ದದ್ದು, ಒಂದು ತಿಂಗಳಿಂದ ನೊರೆ ಮೂತ್ರ."},
+    {tag:"LUXEMBOURGISH → ENGLISH",chip:"EN ⇄ LB",cls:"latin",text:"Moien Dokter. Zënter véier Méint hunn ech Gelenkschmerzen an deenen zwou Hänn a moies méi wéi eng Stonn Steifheet."},
+    {tag:"MALAYALAM → ENGLISH",chip:"EN ⇄ ML",cls:"malayalam",text:"ഹലോ ഡോക്ടർ. നാല് മാസമായി രണ്ട് കൈകളിലും സന്ധി വേദന, രാവിലെ ഒരു മണിക്കൂർ കാഠിന്യം. വെയിലിൽ കൂടുന്ന മുഖത്തെ ചുണങ്ങ്, ഒരു മാസമായി നുരയുള്ള മൂത്രം."},
+    {tag:"FRENCH → ENGLISH",chip:"EN ⇄ FR",cls:"latin",text:"Bonjour docteur. Depuis quatre mois, douleurs articulaires aux deux mains et plus d'une heure de raideur le matin. Une éruption au visage qui s'aggrave au soleil et, depuis un mois, des urines mousseuses."},
+    {tag:"TELUGU → ENGLISH",chip:"EN ⇄ TE",cls:"telugu",text:"హలో డాక్టర్. నాలుగు నెలలుగా రెండు చేతుల్లో కీళ్ల నొప్పి, ఉదయం ఒక గంట బిగుతు. ఎండలో పెరిగే ముఖ దద్దుర్లు, ఒక నెలగా నురుగు మూత్రం."},
+    {tag:"SPANISH → ENGLISH",chip:"EN ⇄ ES",cls:"latin",text:"Hola doctora. Desde hace cuatro meses dolor articular en ambas manos y más de una hora de rigidez matinal. Un sarpullido facial que empeora con el sol y, desde hace un mes, orina espumosa."},
+    {tag:"HINDI → ENGLISH",chip:"EN ⇄ HI",cls:"deva",text:"नमस्ते डॉक्टर। चार महीने से दोनों हाथों में जोड़ों का दर्द, सुबह एक घंटे से ज़्यादा अकड़न। धूप में बढ़ने वाले चेहरे के दाने, और एक महीने से झागदार पेशाब।"},
+    {tag:"ITALIAN → ENGLISH",chip:"EN ⇄ IT",cls:"latin",text:"Salve dottoressa. Da quattro mesi dolori articolari a entrambe le mani e oltre un'ora di rigidità mattutina. Un'eruzione al viso che peggiora al sole e, da un mese, urine schiumose."},
+    {tag:"MARATHI → ENGLISH",chip:"EN ⇄ MR",cls:"deva",text:"नमस्कार डॉक्टर. चार महिन्यांपासून दोन्ही हातांत सांधेदुखी, सकाळी एक तासाहून अधिक जखडण. उन्हात वाढणारे चेहऱ्यावरचे पुरळ, आणि एक महिन्यापासून फेसाळ लघवी."},
+    {tag:"ENGLISH",chip:"EN",cls:"latin",text:"Hello doctor. I've been having joint pain for about four months and morning stiffness for over an hour each morning."}
+  ];
+  const spoken=document.getElementById('spoken');
+  const langtag=document.getElementById('langtag');
+  const enchip=document.getElementById('enchip');
+  let transToken=0;
+
+  function startTranscription(){
+    const my=++transToken;
+    let idx=0;
+    function run(){
+      if(my!==transToken) return;
+      const L=langs[idx];
+      langtag.textContent=L.tag;
+      enchip.textContent=L.chip;
+      spoken.className='spoken '+L.cls;
+      typeWords(spoken, firstSentence(L.text), my, ()=>{
+        if(my!==transToken) return;
+        const last = idx===langs.length-1;
+        idx=(idx+1)%langs.length;
+        setTimeout(run, last?1800:1300);
+      });
+    }
+    run();
+  }
+
+  function firstSentence(text){
+    // pick the first MEANINGFUL sentence (skip a short greeting)
+    const parts = text.match(/[^.।]+[.।]?/g) || [text];
+    let s = (parts[0]||text).trim();
+    if(s.replace(/[.।]/g,'').trim().length < 20 && parts[1]) s = parts[1].trim();
+    return s;
+  }
+
+  function typeWords(el, text, token, done){
+    const words = text.split(' ');
+    let i=0;
+    el.innerHTML='';
+    function step(){
+      if(token!==transToken) return;
+      const shown = words.slice(0,i+1).map(w=>'<span class="w" style="animation:none;opacity:1">'+w+'</span>').join(' ');
+      el.innerHTML = shown + '<span class="caret"></span>';
+      i++;
+      if(i<words.length){
+        setTimeout(step, 26+Math.random()*30);
+      } else if(done){
+        setTimeout(done, 120);
+      }
+    }
+    step();
+  }
+
+  /* ---------- identifier scrub (page 3) ---------- */
+  function resetScrub(){
+    const s=document.getElementById('scrub');
+    const p=document.getElementById('pseud');
+    if(s) s.classList.remove('go');
+    if(p) p.classList.remove('show');
+  }
+  function startScrub(){
+    const s=document.getElementById('scrub');
+    const p=document.getElementById('pseud');
+    if(!s) return;
+    setTimeout(()=>{ s.classList.add('go'); }, 1500);
+    setTimeout(()=>{ p.classList.add('show'); }, 2300);
+  }
+
+  /* ---------- count-up (page 6) ---------- */
+  function startCountUp(){
+    const el=document.getElementById('bignum');
+    if(!el) return;
+    const target=45, dur=1500, start=performance.now();
+    function tick(t){
+      const pr=Math.min(1,(t-start)/dur);
+      const e=1-Math.pow(1-pr,3);
+      el.textContent=Math.round(e*target);
+      if(pr<1) requestAnimationFrame(tick);
+      else el.textContent=target;
+    }
+    setTimeout(()=>requestAnimationFrame(tick), 620);
+  }
+
+  /* ---------- note fill scan (page 4) ---------- */
+  function startNoteFill(){
+    const scan=document.getElementById('fillscan');
+    const note=pages[3].querySelector('.note');
+    if(!scan||!note) return;
+    const start=performance.now(), dur=2000, travel=note.offsetHeight;
+    scan.style.opacity='0';
+    function tick(t){
+      if(cur!==3){ scan.style.opacity='0'; return; }
+      const pr=Math.min(1,(t-start)/dur);
+      scan.style.top=(pr*travel-120)+'px';
+      scan.style.opacity=(pr>0.04 && pr<0.96)?'1':'0';
+      if(pr<1) requestAnimationFrame(tick); else scan.style.opacity='0';
+    }
+    setTimeout(()=>requestAnimationFrame(tick), 700);
+  }
+
+  /* ---------- timeline (page 6) ---------- */
+  function resetTimeline(){
+    pages[5].querySelectorAll('.tnode').forEach(n=>n.classList.remove('on'));
+    pages[5].querySelectorAll('.tseg').forEach(s=>s.classList.remove('on'));
+  }
+  function startTimeline(){
+    const nodes=pages[5].querySelectorAll('.tnode');
+    const segs=pages[5].querySelectorAll('.tseg');
+    const seq=[[nodes[0],1400],[segs[0],1750],[nodes[1],2150],[segs[1],2500],[nodes[2],2900]];
+    seq.forEach(([el,delay])=>setTimeout(()=>{ if(cur===5) el.classList.add('on'); }, delay));
+  }
+
+  /* ---------- kick off page 1 ---------- */
+  progress.style.width = (1/PAGES*100)+'%';
+  function boot(){ scaleStages(); go(0); }
+  if(document.readyState==='complete') boot();
+  else window.addEventListener('load', boot);
+
+})();
+
+</script>
+</body>
+</html>
